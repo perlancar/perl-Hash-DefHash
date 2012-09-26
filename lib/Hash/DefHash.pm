@@ -4,6 +4,7 @@ use 5.010;
 use strict;
 use warnings;
 
+use Scalar::Util qw(blessed);
 use SHARYANTO::String::Util qw(trim_blank_lines);
 
 use Exporter qw(import);
@@ -39,6 +40,9 @@ our $re_key  = qr/
     )\z/x;
 
 sub defhash {
+    # avoid wrapping twice if already a defhash
+    return $_[0] if blessed($_[0]) && $_[0]->isa(__PACKAGE__);
+
     __PACKAGE__->new(@_);
 }
 
@@ -483,6 +487,15 @@ sub set_prop_lang {
 
  # set value for alternative language
  $oldpropval = $dh->set_prop_lang($prop, $lang, $propval);
+
+
+=head1 FUNCTIONS
+
+=head2 defhash([ $hash ]) => OBJ
+
+Shortcut for C<< Hash::DefHash->new($hash) >>. As a bonus, can also detect if
+C<$hash> is already a defhash and returns it immediately instead of wrapping it
+again. Exported by default.
 
 
 =head1 METHODS

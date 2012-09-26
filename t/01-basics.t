@@ -5,6 +5,7 @@ use strict;
 use warnings;
 
 use Hash::DefHash;
+use Scalar::Util qw(blessed);
 use Test::Exception;
 use Test::More 0.98;
 
@@ -216,6 +217,14 @@ subtest "various 1" => sub {
 # XXX summary
 # XXX description
 # XXX tags
+
+subtest "defhash" => sub {
+    my $hash = {};
+    my $dh  = defhash({});
+    ok(blessed($dh), "defhash() creates defhash object");
+    my $dh2 = defhash($dh);
+    is("$dh2", "$dh", "given the defhash object, defhash() returns it");
+};
 
 subtest "lang" => sub {
     my ($dh1, $dh2, $dh3);
