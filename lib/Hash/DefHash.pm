@@ -533,6 +533,8 @@ unset in the current hash.
 
 =head2 $dh->contents
 
+=head2 $dh->default_lang
+
 =head2 $dh->props
 
 =head2 $dh->prop
@@ -563,7 +565,7 @@ unset in the current hash.
 
 =head2 $dh->del_attr
 
-=head2 $dh->del_all_attr
+=head2 $dh->del_all_attrs
 
 =head2 $dh->defhash_v
 

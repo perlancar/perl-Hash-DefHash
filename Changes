@@ -1,5 +1,10 @@
 Revision history for Hash-DefHash
 
+0.03    2012-11-10 (SHARYANTO)
+
+        Follow DefHash 1.0.3 (getting default value for default_lang from LANG).
+
+
 0.02    2012-09-26 (SHARYANTO)
 
         - Allow defhash() to accept and return Hash::DefHash object, so you can
