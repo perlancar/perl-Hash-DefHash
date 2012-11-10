@@ -336,7 +336,9 @@ sub default_lang {
     if ($self->{parent}) {
         $par = $self->{parent}->default_lang;
     }
-    $self->get_prop('default_lang') // $par // $ENV{LANG} // "en_US";
+    my $res = $self->get_prop('default_lang') // $par // $ENV{LANG} // "en_US";
+    $res = "en_US" if $res = "C";
+    $res;
 }
 
 sub name {
