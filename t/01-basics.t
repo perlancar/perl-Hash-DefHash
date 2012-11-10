@@ -229,6 +229,16 @@ subtest "defhash" => sub {
 subtest "lang" => sub {
     my ($dh1, $dh2, $dh3);
 
+    local $ENV{LANG};
+
+    $ENV{LANG} = "C";
+    $dh1 = defhash({});
+    is($dh1->default_lang, "en_US", "default_lang (from LANG)");
+    $ENV{LANG} = "fr_CA";
+    is($dh1->default_lang, "fr_CA", "default_lang (from LANG)");
+
+    undef $ENV{LANG};
+
     $dh1 = defhash({
         default_lang=>"id_ID",
         summary=>"id1",
