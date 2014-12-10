@@ -1,16 +1,17 @@
 package Hash::DefHash;
 
+# DATE
+# VERSION
+
 use 5.010001;
 use strict;
 use warnings;
 
 use Scalar::Util qw(blessed);
-use SHARYANTO::String::Util qw(trim_blank_lines);
+use String::Trim::More qw(trim_blank_lines);
 
 use Exporter qw(import);
 our @EXPORT = qw(defhash);
-
-# VERSION
 
 our $re_prop = qr/\A[A-Za-z][A-Za-z0-9_]*\z/;
 our $re_attr = qr/\A[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)*\z/;
