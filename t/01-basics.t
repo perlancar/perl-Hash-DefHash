@@ -15,24 +15,15 @@ subtest "check" => sub {
         {p=>1},
         {_=>1},
         {_prop1=>1},
-        {"_Prop "=>1},
-        {"_Prop ..."=>1},
-        {"_.b "=>1},
         {Prop_=>1},
         {"p._"=>1},
         {"p._attr"=>1},
-        {"p._attr "=>1},
-        {"p._attr ..."=>1},
         {"p.a._"=>1},
-        {"p._ "=>1},
-        {"p.a._attr "=>1},
-        {"p.a._attr ..."=>1},
         {"p.attr1"=>1},
         {"p.a_"=>1},
         {"p.a.b.c"=>1},
         {".a"=>1},
         {"._"=>1},
-        {"._ ..."=>1},
     );
     my @nok = (
         {""=>1},
@@ -45,6 +36,15 @@ subtest "check" => sub {
         {"a.b."=>1},
         {"."=>1},
         {".a."=>1},
+        {"_Prop "=>1},
+        {"_Prop ..."=>1},
+        {"_.b "=>1},
+        {"p._attr "=>1},
+        {"p._attr ..."=>1},
+        {"p._ "=>1},
+        {"p.a._attr "=>1},
+        {"p.a._attr ..."=>1},
+        {"._ ..."=>1},
     );
     for (0..@ok-1) {
         lives_ok { Hash::DefHash->new($ok[$_]) } "checkok $_";
@@ -87,9 +87,11 @@ subtest "various 1" => sub {
     );
     my $dh = Hash::DefHash->new(\%h);
 
-    is_deeply({ $dh->contents }, \%ct, "contents");
+    is_deeply({ $dh->contents }, \%ct, "contents")
+        or diag explain { $dh->contents };
 
-    is_deeply([ $dh->props ], [qw/p p2/], "props");
+    is_deeply([ $dh->props ], [qw/p/], "props")
+        or diag explain [ $dh->props ];
 
     is($dh->prop("p"), 2, "prop");
     dies_ok { $dh->prop("p2") } "prop (not found -> dies 1)";
@@ -130,7 +132,8 @@ subtest "various 1" => sub {
         "p.a._ib" => 6,
         "p.a.b"   => 5,
         "p2.a"    => 11,
-    }, "del_all_props");
+    }, "del_all_props")
+        or diag explain $dh->hash;
 
     %h = %origh; $dh = Hash::DefHash->new(\%h);
     $dh->del_all_props(1);
@@ -140,14 +143,16 @@ subtest "various 1" => sub {
         "_ip"     => 1,
         "p._ia"   => 4,
         "p.a._ib" => 6,
-    }, "del_all_props (delattrs=1)");
+    }, "del_all_props (delattrs=1)")
+        or diag explain $dh->hash;
 
     %h = %origh; $dh = Hash::DefHash->new(\%h);
 
     is_deeply({ $dh->attrs() }, {
         "a" => 7,
         "a.b" => 9,
-    }, "attrs hash");
+    }, "attrs hash")
+        or diag explain { $dh->attrs };
     is_deeply({ $dh->attrs("p3") }, {
     }, "attrs (non existing prop)");
     is_deeply({ $dh->attrs("p") }, {
@@ -204,10 +209,12 @@ subtest "various 1" => sub {
 
     %h = %origh; $dh = Hash::DefHash->new(\%h);
     $dh->del_all_attrs("p");
-    is_deeply({ $dh->attrs("p") }, {}, "del_all_attrs p");
+    is_deeply({ $dh->attrs("p") }, {}, "del_all_attrs p")
+        or diag explain { $dh->attrs("p") };
     $dh->del_all_attrs("");
     is_deeply({ $dh->attrs("") }, {}, "del_all_attrs hash");
-    is_deeply({ $dh->attrs("p2") }, {a=>11}, "p2 attrs not deleted");
+    is_deeply({ $dh->attrs("p2") }, {a=>11}, "p2 attrs not deleted")
+        or diag explain { $dh->attrs("p2") };
 
 };
 
@@ -280,5 +287,3 @@ subtest "lang" => sub {
 
 DONE_TESTING:
 done_testing;
-
-

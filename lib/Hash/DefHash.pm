@@ -19,7 +19,6 @@ our $re_key  = qr/
     \A(?:
         # 1 = property
         ([A-Za-z_][A-Za-z0-9_]*)
-
         (?:
             (?:
                 # 2 = attr
@@ -27,9 +26,12 @@ our $re_key  = qr/
             ) |
             (?:
                 # 3 = (LANG) shortcut
-                \(([A-Za-z]+)\)
+                \(([A-Za-z]{2}(?:_[A-Za-z]{2})?)\)
             )
-        )
+        )?
+    |
+        # 4 = attr without property
+        \.([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)
     )\z/x;
 
 sub defhash {
@@ -63,7 +65,7 @@ sub check {
     my $h = $self->{hash};
 
     for my $k (keys %$h) {
-        next if $k =~ /$re_key/o;
+        next if $k =~ $re_key;
         die "Invalid hash key '$k'";
     }
     1;
@@ -73,41 +75,44 @@ sub contents {
     my $self = shift;
     my $h = $self->{hash};
 
-    my %prop;
+    my %props;
     for my $k (keys %$h) {
-        my ($ip, $p, $a, $ia, $ha, $iha) = $k =~ /$re_key/o
+        my ($p_prop, $p_attr, $p_lang, $p_attr_wo_prop) = $k =~ $re_key
             or die "Invalid hash key '$k'";
-        next if $ip || $ia || $iha;
         my $v = $h->{$k};
-        if (defined $p) {
-            $prop{$p} //= {};
-            if (defined $a) {
-                substr($a, 0, 1) = "";
-                $prop{$p}{$a} = $v;
+        if (defined $p_prop) {
+            next if $p_prop =~ /\A_/;
+            $props{$p_prop} //= {};
+            if (defined $p_attr) {
+                next if $p_attr =~ /(?:\A|\.)_/;
+                $props{$p_prop}{$p_attr} = $v;
+            } elsif (defined $p_lang) {
+                $props{$p_prop}{"alt.lang.$p_lang"} = $v;
             } else {
-                $prop{$p}{""} = $v;
+                $props{$p_prop}{""} = $v;
             }
         } else {
-            $prop{""} //= {};
-            substr($ha, 0, 1) = "";
-            $prop{""}{$ha} = $v;
+            next if $p_attr_wo_prop =~ /(?:\A|\.)_/;
+            $props{""} //= {};
+            $props{""}{$p_attr_wo_prop} = $v;
         }
     }
-    %prop;
+    %props;
 }
 
 sub props {
     my $self = shift;
     my $h = $self->{hash};
 
-    my %prop;
+    my %props;
     for my $k (keys %$h) {
-        my ($ip, $p) = $k =~ /$re_key/o
+        my ($p_prop, $p_attr, $p_lang, $p_attr_wo_prop) = $k =~ $re_key
             or die "Invalid hash key '$k'";
-        next if $ip || !defined($p);
-        $prop{$p}++;
+        next if defined $p_attr || $p_lang || defined $p_attr_wo_prop;
+        next if $p_prop =~ /\A_/;
+        $props{$p_prop}++;
     }
-    sort keys %prop;
+    sort keys %props;
 }
 
 sub prop {
@@ -136,7 +141,7 @@ sub add_prop {
     my ($self, $prop, $val) = @_;
     my $h = $self->{hash};
 
-    die "Invalid property name '$prop'" unless $prop =~ /$re_prop/o;
+    die "Invalid property name '$prop'" unless $prop =~ $re_prop;
     die "Property '$prop' already exists" if exists $h->{$prop};
     $h->{$prop} = $val;
 }
@@ -145,7 +150,7 @@ sub set_prop {
     my ($self, $prop, $val) = @_;
     my $h = $self->{hash};
 
-    die "Invalid property name '$prop'" unless $prop =~ /$re_prop/o;
+    die "Invalid property name '$prop'" unless $prop =~ $re_prop;
     if (exists $h->{$prop}) {
         my $old = $h->{$prop};
         $h->{$prop} = $val;
@@ -160,7 +165,7 @@ sub del_prop {
     my ($self, $prop, $val) = @_;
     my $h = $self->{hash};
 
-    die "Invalid property name '$prop'" unless $prop =~ /$re_prop/o;
+    die "Invalid property name '$prop'" unless $prop =~ $re_prop;
     if (exists $h->{$prop}) {
         return delete $h->{$prop};
     } else {
@@ -173,10 +178,12 @@ sub del_all_props {
     my $h = $self->{hash};
 
     for my $k (keys %$h) {
-        my ($prop, $attr, $lang) = $k =~ $re_key
+        my ($p_prop, $p_attr, $p_lang, $p_attr_wo_prop) = $k =~ $re_key
             or die "Invalid hash key '$k'";
-        next if $prop =~ /\A_/ || defined $attr && $attr =~ /\._/;
-        if (defined $attr || defined $lang) {
+        next if defined $p_prop && $p_prop =~ /\A_/;
+        next if defined $p_attr && $p_attr =~ /(?:\A|\.)_/;
+        next if defined $p_attr_wo_prop && $p_attr_wo_prop =~ /(?:\A|\.)_/;
+        if (defined $p_attr || defined $p_lang || defined $p_attr_wo_prop) {
             delete $h->{$k} if $delattrs;
         } else {
             delete $h->{$k};
@@ -190,23 +197,26 @@ sub attrs {
     my $h = $self->{hash};
 
     unless ($prop eq '') {
-        die "Invalid property name '$prop'" unless $prop =~ /$re_prop/o;
+        die "Invalid property name '$prop'" unless $prop =~ $re_prop;
     }
 
     my %attrs;
     for my $k (keys %$h) {
-        my ($prop, $attr, $lang) = $k =~ $re_key
+        my ($p_prop, $p_attr, $p_lang, $p_attr_wo_prop) = $k =~ $re_key
             or die "Invalid hash key '$k'";
-        next unless defined $attr || defined $lang;
+        $p_prop //= '';
         my $v = $h->{$k};
-        if ($prop eq '') {
-            next unless $ha;
-            substr($ha, 0, 1) = "";
-            $attrs{$ha} = $v;
-        } else {
-            next unless $a && $prop eq $p;
-            substr($a, 0, 1) = "";
-            $attrs{$a} = $v;
+        if (defined $p_attr) {
+            next unless $prop eq $p_prop;
+            next if $p_attr =~ /(?:\A|\.)_/;
+            $attrs{$p_attr} = $v;
+        } elsif (defined $p_lang) {
+            next unless $prop eq $p_prop;
+            $attrs{"alt.lang.$p_lang"} = $v;
+        } elsif (defined $p_attr_wo_prop) {
+            next unless $prop eq '';
+            next if $p_attr_wo_prop =~ /(?:\A|\.)_/;
+            $attrs{$p_attr_wo_prop} = $v;
         }
     }
     %attrs;
@@ -246,9 +256,9 @@ sub add_attr {
     my $h = $self->{hash};
 
     if ($prop ne '') {
-        die "Invalid property name '$prop'"  unless $prop =~ /$re_prop/o;
+        die "Invalid property name '$prop'"  unless $prop =~ $re_prop;
     }
-    die "Invalid attribute name '$attr'" unless $attr =~ /$re_attr/o;
+    die "Invalid attribute name '$attr'" unless $attr =~ $re_attr;
     my $k = "$prop.$attr";
     die "Attribute '$attr' for property '$prop' already exists"
         if exists($h->{$k});
@@ -261,9 +271,9 @@ sub set_attr {
     my $h = $self->{hash};
 
     if ($prop ne '') {
-        die "Invalid property name '$prop'"  unless $prop =~ /$re_prop/o;
+        die "Invalid property name '$prop'"  unless $prop =~ $re_prop;
     }
-    die "Invalid attribute name '$attr'" unless $attr =~ /$re_attr/o;
+    die "Invalid attribute name '$attr'" unless $attr =~ $re_attr;
     my $k = "$prop.$attr";
     if (exists($h->{$k})) {
         my $old = $h->{$k};
@@ -281,9 +291,9 @@ sub del_attr {
     my $h = $self->{hash};
 
     if ($prop ne '') {
-        die "Invalid property name '$prop'"  unless $prop =~ /$re_prop/o;
+        die "Invalid property name '$prop'"  unless $prop =~ $re_prop;
     }
-    die "Invalid attribute name '$attr'" unless $attr =~ /$re_attr/o;
+    die "Invalid attribute name '$attr'" unless $attr =~ $re_attr;
     my $k = "$prop.$attr";
     if (exists($h->{$k})) {
         return delete $h->{$k};
@@ -297,17 +307,19 @@ sub del_all_attrs {
     $prop //= "";
     my $h = $self->{hash};
 
-    if ($prop ne '') {
-        die "Invalid property name '$prop'"  unless $prop =~ /$re_prop/o;
-    }
     for my $k (keys %$h) {
-        my ($ip, $p, $a, $ia, $ha, $iha) = $k =~ /$re_key/o
+        my ($p_prop, $p_attr, $p_lang, $p_attr_wo_prop) = $k =~ $re_key
             or die "Invalid hash key '$k'";
-        next if $ip || $ia || $iha;
-        if ($prop ne '') {
-            next unless $a && $prop eq $p;
+        if (defined $p_attr) {
+            next unless $prop eq $p_prop;
+            next if $p_attr =~ /(?:\A|\.)_/;
+        } elsif ($p_lang) {
+            next unless $prop eq $p_prop;
+        } elsif (defined $p_attr_wo_prop) {
+            next unless $prop eq '';
+            next if $p_attr_wo_prop =~ /(?:\A|\.)_/;
         } else {
-            next unless $ha;
+            next;
         }
         delete $h->{$k};
     }
