@@ -13,31 +13,23 @@ use String::Trim::More qw(trim_blank_lines);
 use Exporter qw(import);
 our @EXPORT = qw(defhash);
 
-our $re_prop = qr/\A[A-Za-z][A-Za-z0-9_]*\z/;
-our $re_attr = qr/\A[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)*\z/;
+our $re_prop = qr/\A[A-Za-z_][A-Za-z0-9_]*\z/;
+our $re_attr = qr/\A[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*\z/;
 our $re_key  = qr/
     \A(?:
-        # 1 = ignored property
-        (_.*) |
+        # 1 = property
+        ([A-Za-z_][A-Za-z0-9_]*)
 
-        # 2 = property
-        ([A-Za-z][A-Za-z0-9_]*)
-        # 3 = attr
-        ((?:
-                \. (?:
-                    # 4 = ignored attr
-                    (_.*) |
-                    [A-Za-z][A-Za-z0-9_]*
-                )
-            )*) |
-
-        # 5 hash attr
-        ((?: \. (?:
-                    # 6 = ignored hash attr
-                    (_.*) |
-                    [A-Za-z][A-Za-z0-9_]*
-                )
-            )+)
+        (?:
+            (?:
+                # 2 = attr
+                \. ([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)
+            ) |
+            (?:
+                # 3 = (LANG) shortcut
+                \(([A-Za-z]+)\)
+            )
+        )
     )\z/x;
 
 sub defhash {
@@ -181,13 +173,13 @@ sub del_all_props {
     my $h = $self->{hash};
 
     for my $k (keys %$h) {
-        my ($ip, $p, $a, $ia, $ha, $iha) = $k =~ /$re_key/o
+        my ($prop, $attr, $lang) = $k =~ $re_key
             or die "Invalid hash key '$k'";
-        next if $ip || $ia || $iha;
-        if (defined $p) {
-            delete $h->{$k} if !$a || $delattrs;
-        } else {
+        next if $prop =~ /\A_/ || defined $attr && $attr =~ /\._/;
+        if (defined $attr || defined $lang) {
             delete $h->{$k} if $delattrs;
+        } else {
+            delete $h->{$k};
         }
     }
 }
@@ -203,9 +195,9 @@ sub attrs {
 
     my %attrs;
     for my $k (keys %$h) {
-        my ($ip, $p, $a, $ia, $ha, $iha) = $k =~ /$re_key/o
+        my ($prop, $attr, $lang) = $k =~ $re_key
             or die "Invalid hash key '$k'";
-        next if $ip || $ia || $iha;
+        next unless defined $attr || defined $lang;
         my $v = $h->{$k};
         if ($prop eq '') {
             next unless $ha;
