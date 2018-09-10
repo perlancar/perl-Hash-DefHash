@@ -1,3 +1,10 @@
+0.070   2018-09-10 (PERLANCAR)
+
+        - No functional changes.
+
+        - Fix dependency to DefHash (rel=x_spec).
+
+
 0.06    2016-07-12 (PERLANCAR)
 
 	- Update to DefHash 1.0.10.
