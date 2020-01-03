@@ -2,7 +2,9 @@
 
 package Hash::DefHash;
 
+# AUTHORITY
 # DATE
+# DIST
 # VERSION
 
 use 5.010001;
@@ -415,17 +417,18 @@ sub set_prop_lang {
  use Hash::DefHash; # imports defhash()
 
  # create a new defhash object, die when hash is invalid defhash
- $dh = Hash::DefHash->new; # creates an empty hash, or ...
+ $dh = Hash::DefHash->new;                        # creates an empty defhash
+ $dh = Hash::DefHash->new({a=>1});                # use the hashref
+ $dh = Hash::DefHash->new({"contains space"=>1}); # dies!
 
- # ... manipulate an existing hash, defhash() is a synonym for
- # Hash::DefHash->new().
+ # defhash() is a synonym for Hash::DefHash->new().
  $dh = defhash({foo=>1});
 
  # return the original hash
  $hash = $dh->hash;
 
  # list properties
- @prop = $dh->props;
+ @props = $dh->props;
 
  # list property names, values, and attributes, will return ($prop => $attrs,
  # ...). Property values will be put in $attrs with key "". For example:
@@ -509,14 +512,25 @@ again. Exported by default.
 
 =head1 METHODS
 
-=head2 new([ $hash ],[ %opts ]) => OBJ
+=head2 new
 
-Create a new Hash::DefHash object, which is a thin OO skin over the regular Perl
-hash. If C<$hash> is not specified, a new anonymous hash is created.
+Usage:
 
-Internally, the object contains a reference to the hash. It does not create a
-copy of the hash or bless the hash directly. Be careful not to assume that the
-two are the same!
+ $dh = Hash::DefHash->new([ $hash ],[ %opts ]);
+
+Constructor. Create a new Hash::DefHash object, which is a thin OO skin over the
+regular Perl hash. If C<$hash> is not specified, a new anonymous hash is
+created.
+
+Internally, the object contains a hash reference which contains reference to the
+hash (C<< bless({hash=>$orig_hash, ...}, 'Hash::DefHash') >>). It does not
+create a copy of the hash or bless the hash directly. Be careful not to assume
+that the two are the same!
+
+Will check the keys of hash for invalid properties/attributes and will die if
+one is found, e.g..
+
+ $dh = Hash::DefHash->new({"contains space" => 1}); # dies!
 
 Known options:
 
@@ -534,63 +548,105 @@ unset in the current hash.
 
 =back
 
-=head2 $dh->hash
+=head2 hash
 
-=head2 $dh->check
+Usage:
 
-=head2 $dh->contents
+ $hashref = $dh->hash;
 
-=head2 $dh->default_lang
+Return the original hashref.
 
-=head2 $dh->props
+=head2 check
 
-=head2 $dh->prop
+Usage:
 
-=head2 $dh->get_prop
+ $dh->check;
 
-=head2 $dh->prop_exists
+=head2 contents
 
-=head2 $dh->add_prop
+Usage:
 
-=head2 $dh->set_prop
+ my %contents = $dh->contents;
 
-=head2 $dh->del_prop
+=head2 default_lang
 
-=head2 $dh->del_all_props
+Usage:
 
-=head2 $dh->attrs
+ $default_lang = $dh->default_lang;
 
-=head2 $dh->attr
+=head2 props
 
-=head2 $dh->get_attr
+Usage:
 
-=head2 $dh->attr_exists
+ @props = $dh->props;
 
-=head2 $dh->add_attr
+Return list of properties. Will ignore properties that begin with underscore,
+e.g.:
 
-=head2 $dh->set_attr
+ $dh = defhash({a=>1, _b=>2});
+ $dh->props;
 
-=head2 $dh->del_attr
+=head2 prop
 
-=head2 $dh->del_all_attrs
+Usage:
 
-=head2 $dh->defhash_v
+ $val = $dh->prop($name);
 
-=head2 $dh->v
+Get property value, will die if property does not exist.
 
-=head2 $dh->name
+=head2 get_prop
 
-=head2 $dh->summary
+ $val = $dh->get_prop($name);
 
-=head2 $dh->description
+Like L</prop>(), but will return undef if property does not exist.
 
-=head2 $dh->tags
+=head2 prop_exists
 
-=head2 $dh->get_prop_lang
+Usage:
 
-=head2 $dh->get_prop_all_langs
+ $exists = $dh->prop_exists;
 
-=head2 $dh->set_prop_lang
+=head2 add_prop
+
+=head2 set_prop
+
+=head2 del_prop
+
+=head2 del_all_props
+
+=head2 attrs
+
+=head2 attr
+
+=head2 get_attr
+
+=head2 attr_exists
+
+=head2 add_attr
+
+=head2 set_attr
+
+=head2 del_attr
+
+=head2 del_all_attrs
+
+=head2 defhash_v
+
+=head2 v
+
+=head2 name
+
+=head2 summary
+
+=head2 description
+
+=head2 tags
+
+=head2 get_prop_lang
+
+=head2 get_prop_all_langs
+
+=head2 set_prop_lang
 
 
 =head1 SEE ALSO
