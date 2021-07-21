@@ -11,32 +11,17 @@ use 5.010001;
 use strict;
 use warnings;
 
+use Regexp::Pattern::DefHash;
 use Scalar::Util qw(blessed);
 use String::Trim::More qw(trim_blank_lines);
 
 use Exporter qw(import);
 our @EXPORT = qw(defhash);
 
-our $re_prop = qr/\A[A-Za-z_][A-Za-z0-9_]*\z/;
-our $re_attr = qr/\A[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*\z/;
-our $re_key  = qr/
-    \A(?:
-        # 1 = property
-        ([A-Za-z_][A-Za-z0-9_]*)
-        (?:
-            (?:
-                # 2 = attr
-                \. ([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)
-            ) |
-            (?:
-                # 3 = (LANG) shortcut
-                \(([A-Za-z]{2}(?:_[A-Za-z]{2})?)\)
-            )
-        )?
-    |
-        # 4 = attr without property
-        \.([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)
-    )\z/x;
+our $re_prop = $Regexp::Pattern::DefHash::RE{prop}{pat};
+our $re_attr = $Regexp::Pattern::DefHash::RE{attr}{pat};
+our $re_attr_part = $Regexp::Pattern::DefHash::RE{attr_part}{pat};
+our $re_key  = $Regexp::Pattern::DefHash::RE{key} {pat};
 
 sub defhash {
     # avoid wrapping twice if already a defhash
@@ -81,24 +66,16 @@ sub contents {
 
     my %props;
     for my $k (keys %$h) {
-        my ($p_prop, $p_attr, $p_lang, $p_attr_wo_prop) = $k =~ $re_key
+        my ($p_prop, $p_prop_of_attr, $p_attr) = $k =~ $re_key
             or die "Invalid hash key '$k'";
         my $v = $h->{$k};
         if (defined $p_prop) {
             next if $p_prop =~ /\A_/;
             $props{$p_prop} //= {};
-            if (defined $p_attr) {
-                next if $p_attr =~ /(?:\A|\.)_/;
-                $props{$p_prop}{$p_attr} = $v;
-            } elsif (defined $p_lang) {
-                $props{$p_prop}{"alt.lang.$p_lang"} = $v;
-            } else {
-                $props{$p_prop}{""} = $v;
-            }
+            $props{$p_prop}{''} = $v;
         } else {
-            next if $p_attr_wo_prop =~ /(?:\A|\.)_/;
-            $props{""} //= {};
-            $props{""}{$p_attr_wo_prop} = $v;
+            next if $p_attr =~ /(?:\A|\.)_/;
+            $props{$p_prop_of_attr // ""}{$p_attr} = $v;
         }
     }
     %props;
@@ -110,9 +87,9 @@ sub props {
 
     my %props;
     for my $k (keys %$h) {
-        my ($p_prop, $p_attr, $p_lang, $p_attr_wo_prop) = $k =~ $re_key
+        my ($p_prop, $p_prop_of_attr, $p_attr) = $k =~ $re_key
             or die "Invalid hash key '$k'";
-        next if defined $p_attr || $p_lang || defined $p_attr_wo_prop;
+        next unless defined $p_prop;
         next if $p_prop =~ /\A_/;
         $props{$p_prop}++;
     }
@@ -182,12 +159,11 @@ sub del_all_props {
     my $h = $self->{hash};
 
     for my $k (keys %$h) {
-        my ($p_prop, $p_attr, $p_lang, $p_attr_wo_prop) = $k =~ $re_key
+        my ($p_prop, $p_prop_of_attr, $p_attr) = $k =~ $re_key
             or die "Invalid hash key '$k'";
         next if defined $p_prop && $p_prop =~ /\A_/;
         next if defined $p_attr && $p_attr =~ /(?:\A|\.)_/;
-        next if defined $p_attr_wo_prop && $p_attr_wo_prop =~ /(?:\A|\.)_/;
-        if (defined $p_attr || defined $p_lang || defined $p_attr_wo_prop) {
+        if (defined $p_attr) {
             delete $h->{$k} if $delattrs;
         } else {
             delete $h->{$k};
@@ -206,22 +182,14 @@ sub attrs {
 
     my %attrs;
     for my $k (keys %$h) {
-        my ($p_prop, $p_attr, $p_lang, $p_attr_wo_prop) = $k =~ $re_key
+        my ($p_prop, $p_prop_of_attr, $p_attr) = $k =~ $re_key
             or die "Invalid hash key '$k'";
-        $p_prop //= '';
+        next if defined $p_prop;
         my $v = $h->{$k};
-        if (defined $p_attr) {
-            next unless $prop eq $p_prop;
-            next if $p_attr =~ /(?:\A|\.)_/;
-            $attrs{$p_attr} = $v;
-        } elsif (defined $p_lang) {
-            next unless $prop eq $p_prop;
-            $attrs{"alt.lang.$p_lang"} = $v;
-        } elsif (defined $p_attr_wo_prop) {
-            next unless $prop eq '';
-            next if $p_attr_wo_prop =~ /(?:\A|\.)_/;
-            $attrs{$p_attr_wo_prop} = $v;
-        }
+        $p_prop_of_attr //= "";
+        next unless $p_prop_of_attr eq $prop;
+        next if $p_attr =~ /(?:\A|\.)_/;
+        $attrs{$p_attr} = $v;
     }
     %attrs;
 }
@@ -262,7 +230,7 @@ sub add_attr {
     if ($prop ne '') {
         die "Invalid property name '$prop'"  unless $prop =~ $re_prop;
     }
-    die "Invalid attribute name '$attr'" unless $attr =~ $re_attr;
+    die "Invalid attribute name '$attr'" unless $attr =~ $re_attr_part;
     my $k = "$prop.$attr";
     die "Attribute '$attr' for property '$prop' already exists"
         if exists($h->{$k});
@@ -277,7 +245,7 @@ sub set_attr {
     if ($prop ne '') {
         die "Invalid property name '$prop'"  unless $prop =~ $re_prop;
     }
-    die "Invalid attribute name '$attr'" unless $attr =~ $re_attr;
+    die "Invalid attribute name '$attr'" unless $attr =~ $re_attr_part;
     my $k = "$prop.$attr";
     if (exists($h->{$k})) {
         my $old = $h->{$k};
@@ -297,7 +265,7 @@ sub del_attr {
     if ($prop ne '') {
         die "Invalid property name '$prop'"  unless $prop =~ $re_prop;
     }
-    die "Invalid attribute name '$attr'" unless $attr =~ $re_attr;
+    die "Invalid attribute name '$attr'" unless $attr =~ $re_attr_part;
     my $k = "$prop.$attr";
     if (exists($h->{$k})) {
         return delete $h->{$k};
@@ -312,19 +280,12 @@ sub del_all_attrs {
     my $h = $self->{hash};
 
     for my $k (keys %$h) {
-        my ($p_prop, $p_attr, $p_lang, $p_attr_wo_prop) = $k =~ $re_key
+        my ($p_prop, $p_prop_of_attr, $p_attr) = $k =~ $re_key
             or die "Invalid hash key '$k'";
-        if (defined $p_attr) {
-            next unless $prop eq $p_prop;
-            next if $p_attr =~ /(?:\A|\.)_/;
-        } elsif ($p_lang) {
-            next unless $prop eq $p_prop;
-        } elsif (defined $p_attr_wo_prop) {
-            next unless $prop eq '';
-            next if $p_attr_wo_prop =~ /(?:\A|\.)_/;
-        } else {
-            next;
-        }
+        next if defined $p_prop;
+        $p_prop_of_attr //= "";
+        next if $p_attr =~ /(?:\A|\.)_/;
+        next unless $p_prop_of_attr eq $prop;
         delete $h->{$k};
     }
 }
